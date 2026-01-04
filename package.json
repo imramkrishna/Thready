@@ -1,7 +1,20 @@
 {
   "name": "thready",
   "version": "1.0.0",
-  "description": "A npm package that allows multithreading in js and ts.",
+  "description": "A lightweight, type-safe thread pool implementation for JavaScript and TypeScript using Web Workers",
+  "keywords": [
+    "worker",
+    "threads",
+    "multithreading",
+    "thread-pool",
+    "web-worker",
+    "worker-pool",
+    "parallel",
+    "concurrent",
+    "async",
+    "typescript",
+    "performance"
+  ],
   "homepage": "https://github.com/imramkrishna/Thready#readme",
   "bugs": {
     "url": "https://github.com/imramkrishna/Thready/issues"
@@ -12,15 +25,20 @@
   },
   "license": "ISC",
   "author": "Ram Krishna Yadav",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
