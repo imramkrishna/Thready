@@ -1,7 +1,7 @@
 // Main exports for the Thready package
 export { threadPool } from './ThreadPool.js';
 export { WorkerPool } from './WorkerPool.js';
-export type { 
+export type {
   WorkerMessage, 
   WorkerResponse, 
   Task, 
