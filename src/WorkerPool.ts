@@ -82,6 +82,7 @@ export class WorkerPool {
 
   /**
    * Creates a new Worker instance and sets up its event listeners.
+   * Supports both browser Web Workers and Node.js worker_threads.
    * 
    * @returns The created Worker instance.
    */
@@ -94,8 +95,37 @@ export class WorkerPool {
       // This is useful for environments like Vite or Webpack with specific worker loaders.
       worker = this.workerFactory();
     } else {
-      // If it's a string, treat it as a file path and instantiate a standard Worker.
-      worker = new Worker(this.workerFactory);
+      // If it's a string, treat it as a file path and instantiate a Worker.
+      // Detect if we're in Node.js environment
+      const isNode = typeof window === 'undefined' && 
+                     typeof global !== 'undefined' && 
+                     typeof process !== 'undefined' && 
+                     process.versions?.node;
+      
+      if (isNode) {
+        // Node.js environment - use worker_threads
+        try {
+          // Use a dynamic require that works in both ESM and CJS
+          const workerThreads = (globalThis as any).__workerThreads || 
+            (typeof require !== 'undefined' ? require('worker_threads') : null);
+          
+          if (!workerThreads) {
+            throw new Error('worker_threads module not found');
+          }
+          
+          const NodeWorker = workerThreads.Worker;
+          worker = new NodeWorker(this.workerFactory) as any;
+        } catch (error) {
+          throw new Error(
+            `Node.js worker_threads not available. Error: ${(error as Error).message}\n` +
+            'For ESM projects, use a factory function:\n' +
+            'threadPool.init({ worker: () => new Worker(...) })'
+          );
+        }
+      } else {
+        // Browser environment - use Web Workers
+        worker = new Worker(this.workerFactory);
+      }
     }
 
     // Set up the 'onmessage' event handler to receive results from the worker.

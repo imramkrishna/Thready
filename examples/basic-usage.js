@@ -1,29 +1,36 @@
-// Basic Usage Example for Thready
+// Basic Usage Example for Thready in Node.js
 // Run this with: node examples/basic-usage.js
 
 import { threadPool } from 'thready';
+import { Worker } from 'worker_threads';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Initialize the thread pool with your worker
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Initialize the thread pool with your Node.js worker
+// Note: For ESM Node.js, use a factory function
 threadPool.init({
   maxWorkers: 4,
-  worker: './examples/worker.js',
+  worker: () => new Worker(join(__dirname, 'worker-node.mjs')),
 });
 
 async function runExamples() {
-  console.log('🧵 Thready - Basic Usage Examples\n');
+  console.log('🧵 Thready - Basic Usage Examples (Node.js)\n');
 
   try {
     // Example 1: Calculate Fibonacci
-    console.log('1. Calculating Fibonacci(35)...');
+    console.log('1. Calculating Fibonacci(30)...');
     const startFib = Date.now();
-    const fibResult = await threadPool.execute('fibonacci', 35);
+    const fibResult = await threadPool.execute('fibonacci', 30);
     console.log(`   Result: ${fibResult}`);
     console.log(`   Time: ${Date.now() - startFib}ms\n`);
 
     // Example 2: Check if number is prime
-    console.log('2. Checking if 982451653 is prime...');
+    console.log('2. Checking if 104729 is prime...');
     const startPrime = Date.now();
-    const primeResult = await threadPool.execute('primeCheck', 982451653);
+    const primeResult = await threadPool.execute('primeCheck', 104729);
     console.log(`   Result: ${primeResult ? 'Prime' : 'Not Prime'}`);
     console.log(`   Time: ${Date.now() - startPrime}ms\n`);
 
@@ -38,10 +45,10 @@ async function runExamples() {
     console.log('4. Running 5 tasks in parallel...');
     const startParallel = Date.now();
     const parallelTasks = [
-      threadPool.execute('fibonacci', 30),
-      threadPool.execute('factorial', 20),
+      threadPool.execute('fibonacci', 25),
+      threadPool.execute('factorial', 15),
       threadPool.execute('primeCheck', 104729),
-      threadPool.execute('heavyCalculation', 1000000),
+      threadPool.execute('heavyCalculation', 100000),
       threadPool.execute('processArray', [10, 20, 30, 40, 50]),
     ];
     const results = await Promise.all(parallelTasks);
