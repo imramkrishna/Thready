@@ -21,31 +21,49 @@ A lightweight, type-safe thread pool implementation for JavaScript and TypeScrip
 ## Installation
 
 ```bash
-npm install thready
+npm install thready-js
 ```
 
 or with yarn:
 
 ```bash
-yarn add thready
+yarn add thready-js
 ```
 
 ## Quick Start
 
-### 1. Create Your Worker Script
+### 1. Initialize Thready in Your Project
 
-**Important:** You must create your own worker script. Thready doesn't include any built-in worker logic - it only manages the worker pool.
+Run the following command to generate configuration and worker template files:
 
-Create a worker script that handles your specific tasks:
+```bash
+npx thready init
+```
+
+This creates a `thready-js/` folder with:
+- `thready.config.js` - Pre-configured thready instance
+- `thready.worker.mjs` - Node.js worker template
+- `thready.worker.js` - Browser worker template
+
+### 2. Customize Your Worker
+
+Edit `thready-js/thready.worker.mjs` (or `.js` for browser) to add your custom task handlers:
 
 ```javascript
-// worker.js
-self.onmessage = (event) => {
-  const { id, taskType, payload } = event.data;
+// thready-js/thready.worker.mjs
+import { parentPort } from 'worker_threads';
 
+if (!parentPort) {
+  throw new Error('This script must be run as a worker thread');
+}
+
+parentPort.on('message', (message) => {
+  const { id, taskType, payload } = message;
+  
   try {
     let result;
     
+    // Add your custom task handlers here
     switch (taskType) {
       case 'fibonacci':
         result = fibonacci(payload);
@@ -54,14 +72,14 @@ self.onmessage = (event) => {
         result = processData(payload);
         break;
       default:
-        throw new Error(`Unknown task type: ${taskType}`);
+        throw new Error(\`Unknown task type: \${taskType}\`);
     }
-
-    self.postMessage({ id, type: 'result', payload: result });
+    
+    parentPort.postMessage({ id, type: 'result', payload: result });
   } catch (error) {
-    self.postMessage({ id, type: 'error', payload: error.message });
+    parentPort.postMessage({ id, type: 'error', payload: error.message });
   }
-};
+});
 
 function fibonacci(n) {
   if (n <= 1) return n;
@@ -74,52 +92,72 @@ function processData(data) {
 }
 ```
 
-### 2. Initialize and Use the Thread Pool
+### 3. Use Thready in Your Application
+
+Simply import the pre-configured instance and start executing tasks:
 
 ```javascript
-import { threadPool } from 'thready';
+import thready from './thready-js/thready.config.js';
 
-// Initialize the pool once at app startup with YOUR worker script
-threadPool.init({
-  maxWorkers: 4, // Optional: defaults to CPU cores
-  worker: './worker.js' // Path to YOUR worker script
-});
-
-// Execute tasks anywhere in your application
+// Execute tasks - thready is already initialized!
 async function calculate() {
   try {
-    const result = await threadPool.execute('fibonacci', 40);
+    const result = await thready.execute('fibonacci', 40);
     console.log('Result:', result);
   } catch (error) {
     console.error('Task failed:', error);
   }
 }
 
-// Don't forget to cleanup on shutdown
+// Cleanup on shutdown
 process.on('SIGINT', () => {
-  threadPool.shutdown();
+  thready.shutdown();
   process.exit(0);
 });
 ```
 
+That's it! No manual initialization needed - just import and use.
+
 ## Advanced Usage
+
+### Customizing Configuration
+
+Edit `thready-js/thready.config.js` to customize worker count or worker path:
+
+```javascript
+// thready-js/thready.config.js
+import thready from 'thready-js';
+import { Worker } from 'worker_threads';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Initialize with custom settings
+thready.init({
+  maxWorkers: 8, // Increase worker count
+  worker: () => new Worker(join(__dirname, './thready.worker.mjs'), { type: 'module' }),
+});
+
+export default thready;
+```
 
 ### Using with Vite or Webpack
 
-When using module bundlers, you can pass a worker factory function:
+For browser environments, update the config to use Web Workers:
 
 ```javascript
-import { threadPool } from 'thready';
+// thready-js/thready.config.js
+import thready from 'thready-js';
 
-// Vite
-threadPool.init({
-  worker: () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
+// Vite/Webpack
+thready.init({
+  maxWorkers: 4,
+  worker: () => new Worker(new URL('./thready.worker.js', import.meta.url), { type: 'module' })
 });
 
-// Webpack 5
-threadPool.init({
-  worker: () => new Worker(new URL('./worker.js', import.meta.url))
-});
+export default thready;
 ```
 
 ### Transferable Objects (Zero-Copy)
@@ -127,11 +165,13 @@ threadPool.init({
 For better performance with large data, use transferables:
 
 ```javascript
+import thready from './thready-js/thready.config.js';
+
 async function processImage(imageData) {
   const buffer = imageData.buffer;
   
   // Transfer ownership of the buffer (zero-copy)
-  const result = await threadPool.execute(
+  const result = await thready.execute(
     'processImage',
     buffer,
     [buffer] // Transferables array
@@ -141,16 +181,36 @@ async function processImage(imageData) {
 }
 ```
 
-### Using WorkerPool Directly
+### Direct API Usage (Advanced)
 
-For more control, you can use the `WorkerPool` class directly:
+If you prefer manual control, you can import `threadPool` directly:
+
+```javascript
+import { threadPool } from 'thready-js';
+import { Worker } from 'worker_threads';
+
+// Manual initialization
+threadPool.init({
+  maxWorkers: 4,
+  worker: () => new Worker('./custom-worker.mjs')
+});
+
+const result = await threadPool.execute('taskType', payload);
+```
 
 ```javascript
 import { WorkerPool } from 'thready';
+### Using WorkerPool Directly
+
+For even more control, use the `WorkerPool` class:
+
+```javascript
+import { WorkerPool } from 'thready-js';
+import { Worker } from 'worker_threads';
 
 const pool = new WorkerPool({
   maxWorkers: 8,
-  worker: './worker.js' // Your worker implementation
+  worker: () => new Worker('./worker.mjs')
 });
 
 const result = await pool.run('taskType', payload);
@@ -172,9 +232,9 @@ pool.terminate();
 ### Monitoring Pool Statistics
 
 ```javascript
-import { threadPool } from 'thready';
+import thready from './thready-js/thready.config.js';
 
-const stats = threadPool.getStats();
+const stats = thready.getStats();
 console.log('Pool status:', stats);
 // {
 //   totalWorkers: 4,
@@ -189,7 +249,7 @@ console.log('Pool status:', stats);
 ### React
 
 ```jsx
-import { threadPool } from 'thready';
+import thready from './thready-js/thready.config.js';
 import { useEffect, useState } from 'react';
 
 function App() {
@@ -197,20 +257,14 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Initialize on mount with your worker
-    threadPool.init({
-      maxWorkers: 4,
-      worker: '/worker.js' // Your worker script in public folder
-    });
-
     // Cleanup on unmount
-    return () => threadPool.shutdown();
+    return () => thready.shutdown();
   }, []);
 
   const handleCalculate = async () => {
     setLoading(true);
     try {
-      const res = await threadPool.execute('fibonacci', 40);
+      const res = await thready.execute('fibonacci', 40);
       setResult(res);
     } catch (error) {
       console.error(error);
@@ -232,41 +286,33 @@ function App() {
 
 ### Node.js with Worker Threads
 
-For Node.js environments, use worker_threads:
+The generated `thready-js/thready.worker.mjs` is already set up for Node.js worker_threads. Just add your task handlers and use it:
 
 ```javascript
-// worker.mjs
-import { parentPort } from 'worker_threads';
+// index.js
+import thready from './thready-js/thready.config.js';
 
-parentPort.on('message', (message) => {
-  const { id, taskType, payload } = message;
+async function main() {
+  const result = await thready.execute('fibonacci', 35);
+  console.log('Result:', result);
   
-  try {
-    let result;
-    // Process your task
-    result = processTask(taskType, payload);
-    
-    parentPort.postMessage({ id, type: 'result', payload: result });
-  } catch (error) {
-    parentPort.postMessage({ id, type: 'error', payload: error.message });
-  }
-});
+  thready.shutdown();
+}
+
+main();
 ```
 
 ## API Reference
 
-### `threadPool`
+### CLI Commands
 
-The singleton instance for managing workers globally.
+- **`npx thready init`** - Generate configuration and worker template files in `thready-js/` folder
+
+### `thready` (Default Export)
+
+The pre-configured singleton instance from `thready-js/thready.config.js`.
 
 #### Methods
-
-- **`init(config: WorkerPoolConfig): void`**
-  
-  Initializes the thread pool with your worker implementation. Must be called before executing tasks.
-  
-  - `config.maxWorkers` (optional): Maximum number of workers (defaults to CPU cores)
-  - `config.worker`: Path to YOUR worker script or factory function that returns a Worker
 
 - **`execute<T>(taskType: string, payload: any, transferables?: Transferable[]): Promise<T>`**
   
@@ -279,11 +325,28 @@ The singleton instance for managing workers globally.
 
 - **`getStats(): object | null`**
   
-  Returns current pool statistics or null if not initialized.
+  Returns current pool statistics.
 
 - **`shutdown(): void`**
   
   Terminates all workers and releases resources.
+
+### `threadPool` (Named Export - Advanced)
+
+The singleton instance for manual initialization.
+
+#### Methods
+
+- **`init(config: WorkerPoolConfig): void`**
+  
+  Initializes the thread pool with your worker implementation.
+  
+  - `config.maxWorkers` (optional): Maximum number of workers (defaults to CPU cores)
+  - `config.worker`: Path to worker script or factory function that returns a Worker
+
+- **`execute<T>(taskType: string, payload: any, transferables?: Transferable[]): Promise<T>`**
+- **`getStats(): object | null`**
+- **`shutdown(): void`**
 
 ### `WorkerPool`
 
@@ -306,14 +369,13 @@ new WorkerPool(config: WorkerPoolConfig)
 Full TypeScript support with exported types:
 
 ```typescript
-import { 
-  threadPool, 
-  WorkerPool,
-  type WorkerPoolConfig,
-  type WorkerMessage,
-  type WorkerResponse,
-  type Task
-} from 'thready';
+import thready from './thready-js/thready.config.js';
+import type { 
+  WorkerPoolConfig,
+  WorkerMessage,
+  WorkerResponse,
+  Task
+} from 'thready-js';
 
 // Custom typed execution
 interface CalculationResult {
@@ -321,15 +383,15 @@ interface CalculationResult {
   duration: number;
 }
 
-const result = await threadPool.execute<CalculationResult>('calculate', { n: 100 });
+const result = await thready.execute<CalculationResult>('calculate', { n: 100 });
 ```
 
 ## Best Practices
 
-1. **Write Your Own Worker**: Create a worker script tailored to your specific needs
-2. **Initialize Once**: Call `threadPool.init()` only once at application startup
-3. **Keep Workers Pure**: Worker scripts should be framework-agnostic and focused
-4. **Cleanup**: Always call `shutdown()` when your application closes
+1. **Run `npx thready init`**: Start with generated templates for quick setup
+2. **Customize Workers**: Edit `thready-js/thready.worker.mjs` (or `.js`) with your task handlers
+3. **Import Config**: Use `import thready from './thready-js/thready.config.js'` - already initialized
+4. **Cleanup**: Always call `thready.shutdown()` when your application closes
 5. **Transferables**: Use transferables for large data (ArrayBuffers, ImageData) to avoid copying
 6. **Error Handling**: Always wrap `execute()` calls in try-catch blocks
 7. **Task Granularity**: Break large tasks into smaller chunks for better load balancing
@@ -337,10 +399,10 @@ const result = await threadPool.execute<CalculationResult>('calculate', { n: 100
 ## Performance Tips
 
 - Use transferables for data > 1MB
-- Initialize the pool with `maxWorkers` matching your typical workload
-- Monitor stats to tune pool size
+- Adjust `maxWorkers` in `thready-js/thready.config.js` to match your workload
+- Monitor stats with `thready.getStats()` to tune pool size
 - Reuse the same worker script for multiple task types
-- Avoid creating new pools frequently
+- Keep worker scripts focused and pure
 
 ## Browser Support
 

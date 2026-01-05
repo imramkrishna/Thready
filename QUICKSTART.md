@@ -1,37 +1,54 @@
 # 🚀 Quick Start Guide - Thready
 
-> **Important:** Thready only manages the worker pool. You must create your own worker script with your custom logic.
+Get started with Thready in under 2 minutes!
 
 ## Install
 
 ```bash
-npm install thready
+npm install thready-js
 ```
 
 ## 3-Step Setup
 
-### Step 1: Create Your Worker File
+### Step 1: Generate Templates
 
-**You must create your own worker script.** Here's an example:
+```bash
+npx thready init
+```
 
-Create `worker.js` in your project:
+This creates a `thready-js/` folder with:
+- `thready.config.js` - Pre-configured thready instance
+- `thready.worker.mjs` - Node.js worker template  
+- `thready.worker.js` - Browser worker template
+
+### Step 2: Add Your Task Handlers
+
+Edit `thready-js/thready.worker.mjs` (or `.js` for browser):
 
 ```javascript
-self.onmessage = (event) => {
-  const { id, taskType, payload } = event.data;
+// thready-js/thready.worker.mjs
+import { parentPort } from 'worker_threads';
+
+parentPort.on('message', (message) => {
+  const { id, taskType, payload } = message;
   
   try {
     let result;
     
-    if (taskType === 'fibonacci') {
-      result = fibonacci(payload);
+    // Add your custom handlers
+    switch (taskType) {
+      case 'fibonacci':
+        result = fibonacci(payload);
+        break;
+      default:
+        throw new Error(`Unknown task: ${taskType}`);
     }
     
-    self.postMessage({ id, type: 'result', payload: result });
+    parentPort.postMessage({ id, type: 'result', payload: result });
   } catch (error) {
-    self.postMessage({ id, type: 'error', payload: error.message });
+    parentPort.postMessage({ id, type: 'error', payload: error.message });
   }
-};
+});
 
 function fibonacci(n) {
   if (n <= 1) return n;
@@ -39,35 +56,30 @@ function fibonacci(n) {
 }
 ```
 
-### Step 2: Initialize Thread Pool
+### Step 3: Use It!
 
 ```javascript
-import { threadPool } from 'thready';
+import thready from './thready-js/thready.config.js';
 
-threadPool.init({
-  maxWorkers: 4,
-  worker: './worker.js' // Path to YOUR worker script
-});
-```
-
-### Step 3: Execute Tasks
-
-```javascript
 async function calculate() {
-  const result = await threadPool.execute('fibonacci', 40);
+  const result = await thready.execute('fibonacci', 40);
   console.log('Result:', result);
 }
 
 calculate();
 ```
 
+That's it! No manual initialization needed.
+
 ## Common Use Cases
 
 ### Parallel Processing
 
 ```javascript
+import thready from './thready-js/thready.config.js';
+
 const tasks = [30, 32, 34, 36, 38].map(n => 
-  threadPool.execute('fibonacci', n)
+  thready.execute('fibonacci', n)
 );
 const results = await Promise.all(tasks);
 ```
@@ -75,17 +87,16 @@ const results = await Promise.all(tasks);
 ### With React
 
 ```jsx
-import { threadPool } from 'thready';
+import thready from './thready-js/thready.config.js';
 import { useEffect } from 'react';
 
 function App() {
   useEffect(() => {
-    threadPool.init({ maxWorkers: 4, worker: '/worker.js' });
-    return () => threadPool.shutdown();
+    return () => thready.shutdown();
   }, []);
   
   const handleClick = async () => {
-    const result = await threadPool.execute('fibonacci', 40);
+    const result = await thready.execute('fibonacci', 40);
     console.log(result);
   };
   
@@ -93,31 +104,31 @@ function App() {
 }
 ```
 
-### With Vite
+### Customize Configuration
+
+Edit `thready-js/thready.config.js` to adjust worker count:
 
 ```javascript
-threadPool.init({
-  worker: () => new Worker(
-    new URL('./worker.js', import.meta.url),
-    { type: 'module' }
-  )
+thready.init({
+  maxWorkers: 8, // Increase workers
+  worker: () => new Worker(join(__dirname, './thready.worker.mjs'))
 });
 ```
 
 ## API
 
 ```javascript
-// Initialize with your worker
-threadPool.init({ maxWorkers: 4, worker: './your-worker.js' });
+// Import pre-configured instance
+import thready from './thready-js/thready.config.js';
 
 // Execute task
-await threadPool.execute(taskType, payload, transferables?);
+await thready.execute(taskType, payload, transferables?);
 
 // Get statistics
-const stats = threadPool.getStats();
+const stats = thready.getStats();
 
 // Cleanup
-threadPool.shutdown();
+thready.shutdown();
 ```
 
 ## Need More?
