@@ -1,6 +1,7 @@
 // Main exports for the Thready package
+import { threadPool } from './ThreadPool.js';
+
 export { threadPool } from './ThreadPool.js';
-// Alias so users can `import thready from 'thready-js'` and call thready.init/execute
 export { WorkerPool } from './WorkerPool.js';
 export type {
   WorkerMessage, 
@@ -8,3 +9,6 @@ export type {
   Task, 
   WorkerPoolConfig
 } from './types.js';
+
+// Default export for convenience: import thready from 'thready-js'
+export default threadPool;
