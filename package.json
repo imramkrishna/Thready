@@ -1,5 +1,5 @@
 {
-  "name": "thready",
+  "name": "thready-js",
   "version": "1.0.0",
   "description": "A lightweight, type-safe thread pool manager for JavaScript and TypeScript. Bring your own worker - we handle the pooling.",
   "keywords": [
@@ -42,7 +42,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsup --config tsup.config.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
@@ -51,6 +51,6 @@
     "typescript": "^5.9.3"
   },
   "bin": {
-    "thready": "./dist/cli/index.js"
+    "thready": "./dist/cli.js"
   }
 }

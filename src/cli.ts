@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { init } from "./workerTemplates.js";
 const args = process.argv.slice(2);
 const command = args[0];
